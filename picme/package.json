@@ -1,0 +1,12 @@
+{
+  "name": "picme",
+  "version": "1.0.0",
+  "description": "picme — retro film photobooth",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "node-printer": "^0.0.3"
+  }
+}
