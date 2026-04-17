@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>picme</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,200;0,300;0,400;0,500;1,300&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+/* ─── RESET & ROOT ─── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0ece5;
+  --surface:#f7f4f0;
+  --surface2:#e8e4dc;
+  --border:rgba(0,0,0,0.08);
+  --border2:rgba(0,0,0,0.15);
+  --text:#1c1b19;
+  --text-mid:#6b6860;
+  --text-dim:#b0ada6;
+  --red:#b83232;
+  --green:#3a7d55;
+  --gold:#c9a46a;
+}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-weight:300;overflow:hidden;user-select:none;-webkit-user-select:none}
+
+/* ─── GRAIN ─── */
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity:0.04;
+}
+
+/* ─── TOPBAR ─── */
+.topbar{
+  height:48px;display:flex;align-items:center;padding:0 22px;
+  border-bottom:1px solid var(--border);background:var(--surface);
+  position:relative;z-index:50;gap:12px;flex-shrink:0;
+}
+.logo{font-size:15px;font-weight:500;letter-spacing:-.4px;color:var(--text)}
+.logo sup{font-size:7px;color:var(--text-dim);font-weight:300;vertical-align:super;letter-spacing:0}
+.logo-tag{font-size:8px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;font-weight:300;border:1px solid var(--border2);padding:2px 6px;border-radius:20px}
+.topbar-nav{position:absolute;left:50%;transform:translateX(-50%);display:flex;gap:28px}
+.nav-btn{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text-dim);cursor:pointer;font-weight:400;transition:color .2s;background:none;border:none;font-family:'DM Sans',sans-serif;padding:4px 0}
+.nav-btn.active{color:var(--text)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.hw-status{display:flex;align-items:center;gap:5px;font-size:8px;letter-spacing:1.5px;color:var(--text-dim);text-transform:uppercase}
+.hw-dot{width:5px;height:5px;border-radius:50%;background:var(--text-dim)}
+.hw-dot.ok{background:var(--green);animation:pulse-dot 2.5s ease-in-out infinite}
+.hw-dot.err{background:var(--red)}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}
+.clock{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:1px}
+
+/* ─── VIEWS ─── */
+.view{display:none;height:calc(100vh - 48px)}
+.view.active{display:flex}
+
+/* ─── CAPTURE VIEW ─── */
+#view-capture{
+  display:none;
+}
+#view-capture.active{
+  display:grid;
+  grid-template-columns:1fr 298px;
+}
+
+/* ─── LEFT PANEL ─── */
+.cam-panel{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:20px 28px;gap:13px;border-right:1px solid var(--border);overflow:hidden;
+}
+
+/* camera frame */
+.cam-wrap{width:100%;max-width:560px;position:relative;flex-shrink:0}
+.cam-frame{
+  width:100%;aspect-ratio:4/3;background:#111;
+  overflow:hidden;position:relative;
+}
+#video{width:100%;height:100%;object-fit:cover;display:block;transform:scaleX(-1)}
+#preview-canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+/* sprockets */
+.spr{
+  position:absolute;top:0;bottom:0;width:17px;
+  display:flex;flex-direction:column;justify-content:space-around;
+  align-items:center;padding:9px 0;z-index:6;pointer-events:none;
+}
+.spr.l{left:0;background:rgba(0,0,0,.62)}
+.spr.r{right:0;background:rgba(0,0,0,.62)}
+.spr-hole{width:8px;height:6px;background:var(--bg);border-radius:1px;opacity:.88}
+
+/* flash */
+.flash-el{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:20;transition:opacity .05s}
+.flash-el.go{opacity:1}
+
+/* countdown */
+.cd-wrap{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.18);opacity:0;pointer-events:none;z-index:15;transition:opacity .3s;
+}
+.cd-wrap.show{opacity:1}
+.cd-num{
+  font-family:'DM Mono',monospace;font-size:96px;font-weight:300;
+  color:#fff;letter-spacing:-4px;line-height:1;
+  text-shadow:0 2px 30px rgba(0,0,0,.4);
+}
+@keyframes cdpop{0%{transform:scale(1.25);opacity:0}15%{transform:scale(1);opacity:1}88%{opacity:1}100%{opacity:.5}}
+
+/* progress bar inside frame */
+.progress-bar-wrap{
+  position:absolute;bottom:0;left:17px;right:17px;height:2px;
+  background:rgba(255,255,255,.12);z-index:7;pointer-events:none;
+}
+.progress-bar{height:100%;background:rgba(255,255,255,.5);width:0;transition:width .4s ease}
+
+/* cam status */
+.cam-status{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:6px 0 0;width:100%;max-width:560px;
+}
+.live-pill{display:flex;align-items:center;gap:6px}
+.live-dot{width:5px;height:5px;border-radius:50%;background:var(--red);animation:blink 1.8s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
+.live-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase}
+.tally{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim)}
+.tally b{color:var(--text);font-weight:400}
+
+/* ─── FILTER ROW ─── */
+.filter-row{
+  display:flex;width:100%;max-width:560px;
+  border:1px solid var(--border2);background:var(--surface);overflow:hidden;flex-shrink:0;
+}
+.fi{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  gap:4px;padding:8px 3px 7px;cursor:pointer;
+  border-right:1px solid var(--border);transition:background .14s;
+}
+.fi:last-child{border-right:none}
+.fi:hover{background:var(--surface2)}
+.fi.active{background:var(--text)}
+.fi-thumb{width:36px;height:27px;border-radius:1px;overflow:hidden;flex-shrink:0}
+.fi-thumb canvas{width:100%;height:100%;display:block}
+.fi-name{font-size:7px;letter-spacing:2px;text-transform:uppercase;color:var(--text-mid);font-weight:500}
+.fi.active .fi-name{color:#fff}
+
+/* ─── CAPTURE ROW ─── */
+.capture-row{
+  display:flex;align-items:center;justify-content:space-between;
+  width:100%;max-width:560px;flex-shrink:0;
+}
+.cap-hint strong{display:block;font-size:13px;color:var(--text);font-weight:400;letter-spacing:-.2px}
+.cap-hint span{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim)}
+.shutter-btn{
+  width:56px;height:56px;border-radius:50%;
+  border:1.5px solid var(--text);background:transparent;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:transform .15s;flex-shrink:0;
+}
+.shutter-btn:hover:not(:disabled){transform:scale(1.06)}
+.shutter-btn:active:not(:disabled){transform:scale(.95)}
+.shutter-btn:disabled{opacity:.4;cursor:default}
+.shutter-inner{width:42px;height:42px;border-radius:50%;background:var(--text);transition:background .2s}
+.shutter-btn.counting .shutter-inner{background:var(--red)}
+
+/* dots */
+.shot-dots{display:flex;gap:4px;flex-wrap:wrap;max-width:82px}
+.sdot{width:6px;height:6px;border-radius:50%;border:1px solid var(--border2);background:transparent;transition:all .3s}
+.sdot.done{background:var(--text);border-color:var(--text)}
+.sdot.latest{background:var(--red);border-color:var(--red)}
+
+/* ─── RIGHT PANEL ─── */
+.right-panel{display:flex;flex-direction:column;background:var(--surface);overflow:hidden}
+.rp-sec{padding:15px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.rp-lbl{font-size:8px;letter-spacing:3px;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;font-weight:400}
+
+/* grid selector */
+.grid-opts{display:flex;gap:6px}
+.g-opt{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+.g-prev{
+  width:33px;height:48px;border:1px solid var(--border2);
+  border-radius:2px;padding:3px;display:flex;flex-direction:column;
+  gap:2px;background:var(--surface2);transition:border-color .2s;
+}
+.g-cell{flex:1;background:rgba(0,0,0,.1);border-radius:1px;transition:background .2s}
+.g-opt.active .g-prev{border-color:var(--text)}
+.g-opt.active .g-cell{background:rgba(0,0,0,.38)}
+.g-lbl{font-size:7px;letter-spacing:1px;color:var(--text-dim);font-family:'DM Mono',monospace}
+.g-opt.active .g-lbl{color:var(--text)}
+
+/* photo chooser */
+.chooser{flex:1;overflow-y:auto;padding:13px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+.chooser-lbl{font-size:8px;letter-spacing:3px;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px;display:block}
+.chooser-hint{font-size:9px;color:var(--text-dim);margin-bottom:10px;line-height:1.5}
+.thumb-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.ti{
+  aspect-ratio:4/3;position:relative;cursor:pointer;
+  overflow:hidden;border:1.5px solid transparent;
+  background:var(--surface2);transition:border-color .15s;
+}
+.ti canvas{width:100%;height:100%;display:block;object-fit:cover}
+.ti.sel{border-color:var(--text)}
+.ti.sel .ti-badge{opacity:1}
+.ti-badge{
+  position:absolute;top:3px;right:3px;width:15px;height:15px;
+  border-radius:50%;background:var(--text);color:#fff;
+  font-family:'DM Mono',monospace;font-size:8px;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .2s;
+}
+.ti-empty{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+.ti-empty span{font-size:14px;color:rgba(0,0,0,.1)}
+
+/* strip preview */
+.strip-area{
+  border-top:1px solid var(--border);padding:11px 14px 9px;
+  display:flex;flex-direction:column;align-items:center;gap:8px;flex-shrink:0;
+}
+.strip-card{
+  background:#fff;padding:6px 6px 18px;width:188px;
+  box-shadow:0 4px 22px rgba(0,0,0,.13);
+  display:flex;flex-direction:column;gap:3px;flex-shrink:0;
+}
+.s-slot{width:100%;aspect-ratio:4/3;overflow:hidden}
+.s-slot canvas{width:100%;height:100%;display:block}
+.s-slot-empty{width:100%;height:100%;background:#f0ece5;display:flex;align-items:center;justify-content:center}
+.s-slot-empty span{font-size:14px;color:rgba(0,0,0,.1)}
+.strip-wm{text-align:center;margin-top:4px;font-size:8px;letter-spacing:5px;color:rgba(0,0,0,.18);text-transform:lowercase;font-weight:500}
+
+/* printer bar */
+.printer-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:9px 14px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.printer-info{display:flex;align-items:center;gap:8px}
+.printer-icon{font-size:13px;opacity:.5}
+.printer-name-txt{font-size:8px;letter-spacing:1px;color:var(--text-mid);text-transform:uppercase}
+.printer-status-txt{font-size:7px;color:var(--green);display:flex;align-items:center;gap:3px;margin-top:1px}
+.printer-status-txt::before{content:'';width:4px;height:4px;border-radius:50%;background:var(--green);display:inline-block}
+.printer-status-txt.cloud{color:var(--text-dim)}
+.printer-status-txt.cloud::before{background:var(--text-dim)}
+.printer-select{
+  font-size:8px;letter-spacing:1px;color:var(--text-dim);
+  background:transparent;border:1px solid var(--border2);
+  font-family:'DM Sans',sans-serif;padding:3px 6px;cursor:pointer;
+  border-radius:1px;
+}
+
+/* ─── ACTIONS ─── */
+.actions{padding:10px 12px;display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+.btn-primary{
+  width:100%;padding:10px;background:var(--text);color:var(--bg);
+  border:none;font-family:'DM Sans',sans-serif;font-size:9px;
+  letter-spacing:3px;text-transform:uppercase;cursor:pointer;font-weight:500;
+  transition:opacity .2s;border-radius:1px;
+}
+.btn-primary:hover:not(:disabled){opacity:.85}
+.btn-primary:disabled{opacity:.3;cursor:default}
+.btn-print{
+  width:100%;padding:10px;background:transparent;color:var(--text);
+  border:1px solid var(--text);font-family:'DM Sans',sans-serif;font-size:9px;
+  letter-spacing:3px;text-transform:uppercase;cursor:pointer;
+  transition:all .2s;border-radius:1px;display:flex;align-items:center;justify-content:center;gap:7px;
+}
+.btn-print:hover:not(:disabled){background:var(--text);color:var(--bg)}
+.btn-print:disabled{opacity:.3;cursor:default}
+.btn-ghost{
+  width:100%;padding:9px;background:transparent;color:var(--text-dim);
+  border:1px solid var(--border2);font-family:'DM Sans',sans-serif;font-size:9px;
+  letter-spacing:3px;text-transform:uppercase;cursor:pointer;transition:all .2s;border-radius:1px;
+}
+.btn-ghost:hover{color:var(--text);border-color:var(--text)}
+
+/* ─── TOAST ─── */
+.toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(8px);
+  background:var(--text);color:var(--bg);padding:10px 20px;
+  font-size:9px;letter-spacing:2px;text-transform:uppercase;
+  opacity:0;transition:all .3s;pointer-events:none;z-index:9998;
+  border-radius:1px;white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ─── GALLERY VIEW ─── */
+#view-gallery{display:none}
+#view-gallery.active{display:flex;flex-direction:column;align-items:center;padding:32px;gap:20px;overflow-y:auto}
+.gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:20px;width:100%;max-width:900px}
+.gallery-item{background:#fff;padding:6px 6px 16px;box-shadow:0 2px 16px rgba(0,0,0,.1);cursor:pointer;transition:transform .2s}
+.gallery-item:hover{transform:translateY(-2px)}
+.gallery-item img{width:100%;display:block}
+.gallery-item .gi-wm{text-align:center;margin-top:5px;font-size:8px;letter-spacing:4px;color:rgba(0,0,0,.2);text-transform:lowercase}
+.gallery-empty{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--text-dim)}
+
+/* ─── NO CAM ─── */
+.no-cam{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:10px;
+  background:#1c1b19;color:rgba(255,255,255,.25);
+  font-size:9px;letter-spacing:3px;text-transform:uppercase;z-index:30;
+}
+
+/* ─── PRINT PREVIEW IFRAME (hidden) ─── */
+#print-frame{position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;border:none}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo">picme <sup>®</sup></div>
+  <div class="logo-tag">Studio</div>
+  <div class="topbar-nav">
+    <button class="nav-btn active" onclick="switchView('capture')">Capture</button>
+    <button class="nav-btn" onclick="switchView('gallery')">Gallery</button>
+  </div>
+  <div class="topbar-right">
+    <div class="hw-status"><div class="hw-dot" id="cam-dot"></div><span id="cam-status-lbl">Camera</span></div>
+    <div class="hw-status"><div class="hw-dot" id="prt-dot"></div><span id="prt-status-lbl">Printer</span></div>
+    <div class="clock" id="clock">—</div>
+  </div>
+</div>
+
+<!-- CAPTURE VIEW -->
+<div class="view active" id="view-capture">
+
+  <!-- LEFT -->
+  <div class="cam-panel">
+    <div class="cam-wrap">
+      <div class="cam-frame" id="cam-frame">
+        <video id="video" autoplay muted playsinline></video>
+        <canvas id="preview-canvas"></canvas>
+        <div class="spr l" id="spr-l"></div>
+        <div class="spr r" id="spr-r"></div>
+        <div class="flash-el" id="flash"></div>
+        <div class="cd-wrap" id="cd-wrap">
+          <div class="cd-num" id="cd-num">5</div>
+        </div>
+        <div class="progress-bar-wrap"><div class="progress-bar" id="prog-bar"></div></div>
+      </div>
+      <div class="cam-status">
+        <div class="live-pill">
+          <div class="live-dot" id="live-dot"></div>
+          <div class="live-lbl" id="live-lbl">initialising</div>
+        </div>
+        <div class="tally"><b id="shot-n">0</b> / 10 shots</div>
+      </div>
+    </div>
+
+    <!-- FILTERS -->
+    <div class="filter-row" id="filter-row"></div>
+
+    <!-- CAPTURE -->
+    <div class="capture-row">
+      <div class="cap-hint">
+        <strong>Take a photo</strong>
+        <span>5 sec · space or tap</span>
+      </div>
+      <div class="shot-dots" id="shot-dots"></div>
+      <button class="shutter-btn" id="shutter" onclick="startCountdown()">
+        <div class="shutter-inner"></div>
+      </button>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right-panel">
+
+    <div class="rp-sec">
+      <div class="rp-lbl">Layout</div>
+      <div class="grid-opts" id="grid-opts"></div>
+    </div>
+
+    <div class="chooser">
+      <span class="chooser-lbl">Select for strip</span>
+      <span class="chooser-hint" id="chooser-hint">Take photos first — then tap to add them to your strip.</span>
+      <div class="thumb-grid" id="thumb-grid"></div>
+    </div>
+
+    <div class="strip-area">
+      <div class="rp-lbl" style="align-self:flex-start;margin-bottom:0">Preview</div>
+      <div class="strip-card" id="strip-card"></div>
+    </div>
+
+    <div class="printer-bar">
+      <div class="printer-info">
+        <div class="printer-icon">🖨️</div>
+        <div>
+          <div class="printer-name-txt" id="prt-name">Detecting...</div>
+          <div class="printer-status-txt" id="prt-stat-txt">Checking</div>
+        </div>
+      </div>
+      <select class="printer-select" id="prt-select" style="display:none">
+        <option value="">Default</option>
+      </select>
+    </div>
+
+    <div class="actions">
+      <button class="btn-primary" id="btn-save" onclick="saveStrip()" disabled>Save Strip</button>
+      <button class="btn-print" id="btn-print" onclick="printStrip()" disabled>🖨 &nbsp;Print Strip</button>
+      <button class="btn-ghost" onclick="resetAll()">Retake All</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- GALLERY VIEW -->
+<div class="view" id="view-gallery">
+  <div class="gallery-grid" id="gallery-grid">
+    <div class="gallery-empty" id="gallery-empty">No strips saved yet</div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- HIDDEN PRINT IFRAME -->
+<iframe id="print-frame"></iframe>
+
+<!-- ─────────── JAVASCRIPT ─────────── -->
+<script>
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+const FILTERS = [
+  { name:'Natural', fn:null },
+  { name:'Noir',    fn:d=>noir(d) },
+  { name:'Fade',    fn:d=>fade(d) },
+  { name:'Warm',    fn:d=>warm(d) },
+  { name:'Cool',    fn:d=>cool(d) },
+  { name:'Matte',   fn:d=>matte(d) },
+  { name:'Vivid',   fn:d=>vivid(d) },
+];
+
+let curFilter   = 0;
+let curGrid     = 3;
+let photos      = [];     // ImageData[]
+let selected    = [];     // indices into photos[]
+let counting    = false;
+let strips      = [];     // saved strips (dataURLs) for gallery
+let printerList = [];
+let curPrinter  = null;
+let cloudMode   = false;
+
+const video     = document.getElementById('video');
+const prevCvs   = document.getElementById('preview-canvas');
+const pCtx      = prevCvs.getContext('2d');
+const capCvs    = document.createElement('canvas');
+const cCtx      = capCvs.getContext('2d');
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+(function init(){
+  buildSprockets();
+  buildGridOpts();
+  buildFilterRow();
+  renderDots();
+  renderThumbs();
+  renderStrip();
+  clock();
+  setInterval(clock, 1000);
+  setInterval(refreshFilterThumbs, 2500);
+  initCamera();
+  fetchPrinters();
+  document.addEventListener('keydown', e => {
+    if(e.code === 'Space' && document.getElementById('view-capture').classList.contains('active')){
+      e.preventDefault(); startCountdown();
+    }
+  });
+})();
+
+// ═══════════════════════════════════════
+// CLOCK
+// ═══════════════════════════════════════
+function clock(){
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:false});
+}
+
+// ═══════════════════════════════════════
+// SPROCKETS
+// ═══════════════════════════════════════
+function buildSprockets(){
+  ['spr-l','spr-r'].forEach(id=>{
+    const el = document.getElementById(id);
+    for(let i=0;i<9;i++){
+      const h = document.createElement('div');
+      h.className = 'spr-hole';
+      el.appendChild(h);
+    }
+  });
+}
+
+// ═══════════════════════════════════════
+// GRID SELECTOR
+// ═══════════════════════════════════════
+function buildGridOpts(){
+  const wrap = document.getElementById('grid-opts');
+  [1,2,3,4,5].forEach(n => {
+    const opt = document.createElement('div');
+    opt.className = 'g-opt' + (n === curGrid ? ' active' : '');
+    opt.dataset.n = n;
+    let cells = '';
+    for(let i=0;i<n;i++) cells += '<div class="g-cell"></div>';
+    opt.innerHTML = `<div class="g-prev">${cells}</div><div class="g-lbl">${n}×1</div>`;
+    opt.onclick = () => setGrid(n);
+    wrap.appendChild(opt);
+  });
+}
+
+function setGrid(n){
+  curGrid = n;
+  while(selected.length > n) selected.pop();
+  document.querySelectorAll('.g-opt').forEach(el => el.classList.toggle('active', +el.dataset.n === n));
+  renderThumbs();
+  renderStrip();
+}
+
+// ═══════════════════════════════════════
+// CAMERA
+// ═══════════════════════════════════════
+async function initCamera(){
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video:{ width:{ ideal:1280 }, height:{ ideal:960 }, facingMode:'user' },
+      audio:false
+    });
+    video.srcObject = stream;
+    video.onloadedmetadata = () => {
+      prevCvs.width  = video.videoWidth;
+      prevCvs.height = video.videoHeight;
+      capCvs.width   = video.videoWidth;
+      capCvs.height  = video.videoHeight;
+      document.getElementById('cam-dot').classList.add('ok');
+      document.getElementById('live-lbl').textContent = 'live';
+      renderLoop();
+      refreshFilterThumbs();
+    };
+  } catch(e){
+    document.getElementById('cam-frame').innerHTML =
+      `<div class="no-cam"><svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg><span>Allow camera access</span></div>`;
+    document.getElementById('cam-dot').classList.add('err');
+    document.getElementById('live-lbl').textContent = 'no camera';
+  }
+}
+
+// ═══════════════════════════════════════
+// RENDER LOOP
+// ═══════════════════════════════════════
+function renderLoop(){
+  if(video.readyState >= 2){
+    // mirror
+    pCtx.save();
+    pCtx.translate(prevCvs.width, 0);
+    pCtx.scale(-1, 1);
+    pCtx.drawImage(video, 0, 0);
+    pCtx.restore();
+    // filter
+    if(FILTERS[curFilter].fn){
+      const id = pCtx.getImageData(0,0,prevCvs.width,prevCvs.height);
+      FILTERS[curFilter].fn(id);
+      pCtx.putImageData(id,0,0);
+    }
+    drawVignette(pCtx, prevCvs.width, prevCvs.height);
+    drawFilmLeak(pCtx, prevCvs.width, prevCvs.height);
+  }
+  requestAnimationFrame(renderLoop);
+}
+
+function drawVignette(ctx,w,h){
+  const g = ctx.createRadialGradient(w/2,h/2,h*.28,w/2,h/2,h*.82);
+  g.addColorStop(0,'rgba(0,0,0,0)');
+  g.addColorStop(1,'rgba(0,0,0,.42)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,w,h);
+}
+function drawFilmLeak(ctx,w,h){
+  const g = ctx.createLinearGradient(0,0,0,h*.2);
+  g.addColorStop(0,'rgba(255,235,170,.07)');
+  g.addColorStop(1,'rgba(255,235,170,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,w,h*.2);
+}
+
+// ═══════════════════════════════════════
+// FILTER ROW
+// ═══════════════════════════════════════
+function buildFilterRow(){
+  const row = document.getElementById('filter-row');
+  row.innerHTML = '';
+  FILTERS.forEach((f,i) => {
+    const item = document.createElement('div');
+    item.className = 'fi' + (i === curFilter ? ' active' : '');
+    item.dataset.i = i;
+    const th = document.createElement('div'); th.className = 'fi-thumb';
+    const tc = document.createElement('canvas'); tc.width=72; tc.height=54;
+    th.appendChild(tc);
+    const nm = document.createElement('div'); nm.className = 'fi-name'; nm.textContent = f.name;
+    item.appendChild(th); item.appendChild(nm);
+    item.onclick = () => {
+      curFilter = i;
+      document.querySelectorAll('.fi').forEach(el => el.classList.toggle('active', +el.dataset.i === i));
+    };
+    row.appendChild(item);
+  });
+  refreshFilterThumbs();
+}
+
+function drawFilterThumb(tc, fi){
+  if(video.readyState < 2) return;
+  const ctx = tc.getContext('2d');
+  ctx.save(); ctx.translate(tc.width,0); ctx.scale(-1,1);
+  ctx.drawImage(video,0,0,tc.width,tc.height);
+  ctx.restore();
+  if(FILTERS[fi].fn){
+    const id = ctx.getImageData(0,0,tc.width,tc.height);
+    FILTERS[fi].fn(id);
+    ctx.putImageData(id,0,0);
+  }
+  drawVignette(ctx,tc.width,tc.height);
+}
+
+function refreshFilterThumbs(){
+  document.querySelectorAll('.fi').forEach((item,i) => {
+    const tc = item.querySelector('canvas');
+    if(tc) drawFilterThumb(tc,i);
+  });
+}
+
+// ═══════════════════════════════════════
+// DOTS
+// ═══════════════════════════════════════
+function renderDots(){
+  const wrap = document.getElementById('shot-dots');
+  wrap.innerHTML = '';
+  for(let i=0;i<10;i++){
+    const d = document.createElement('div');
+    d.className = 'sdot' + (i < photos.length ? (i === photos.length-1 ? ' latest' : ' done') : '');
+    wrap.appendChild(d);
+  }
+  document.getElementById('shot-n').textContent = photos.length;
+}
+
+// ═══════════════════════════════════════
+// COUNTDOWN + CAPTURE
+// ═══════════════════════════════════════
+function startCountdown(){
+  if(counting || photos.length >= 10) return;
+  const shutter = document.getElementById('shutter');
+  if(shutter.disabled) return;
+  counting = true;
+  shutter.classList.add('counting');
+  shutter.disabled = true;
+  const cdWrap = document.getElementById('cd-wrap');
+  const cdNum  = document.getElementById('cd-num');
+  const prog   = document.getElementById('prog-bar');
+  cdWrap.classList.add('show');
+  prog.style.width = '0';
+  let n = 5;
+  cdNum.textContent = n;
+  cdNum.style.animation = 'none';
+  void cdNum.offsetHeight;
+  cdNum.style.animation = 'cdpop 1s ease-out';
+
+  // animate progress bar
+  setTimeout(() => { prog.style.transition = 'width 5s linear'; prog.style.width = '100%'; }, 30);
+
+  const tick = setInterval(() => {
+    n--;
+    if(n <= 0){
+      clearInterval(tick);
+      cdWrap.classList.remove('show');
+      prog.style.transition = 'none';
+      prog.style.width = '0';
+      shutter.classList.remove('counting');
+      counting = false;
+      shutter.disabled = false;
+      doCapture();
+    } else {
+      cdNum.textContent = n;
+      cdNum.style.animation = 'none';
+      void cdNum.offsetHeight;
+      cdNum.style.animation = 'cdpop 1s ease-out';
+    }
+  }, 1000);
+}
+
+function doCapture(){
+  // flash
+  const fl = document.getElementById('flash');
+  fl.classList.add('go');
+  setTimeout(() => fl.classList.remove('go'), 150);
+  // grab current filtered frame
+  cCtx.drawImage(prevCvs, 0, 0);
+  const id = cCtx.getImageData(0,0,capCvs.width,capCvs.height);
+  photos.push(id);
+  // auto-select into strip if room
+  const idx = photos.length - 1;
+  if(selected.length < curGrid && !selected.includes(idx)) selected.push(idx);
+  renderDots();
+  renderThumbs();
+  renderStrip();
+  updateButtons();
+  if(photos.length === 1) document.getElementById('chooser-hint').style.display = 'none';
+}
+
+// ═══════════════════════════════════════
+// THUMBNAIL GRID
+// ═══════════════════════════════════════
+function renderThumbs(){
+  const grid = document.getElementById('thumb-grid');
+  grid.innerHTML = '';
+  for(let i=0;i<10;i++){
+    const item = document.createElement('div');
+    const isSel = selected.includes(i);
+    item.className = 'ti' + (isSel ? ' sel' : '');
+    if(photos[i]){
+      const tc = document.createElement('canvas');
+      tc.width = 160; tc.height = 120;
+      imageDataToCanvas(photos[i], tc);
+      item.appendChild(tc);
+      const badge = document.createElement('div');
+      badge.className = 'ti-badge';
+      const pos = selected.indexOf(i);
+      badge.textContent = pos >= 0 ? pos + 1 : '';
+      item.appendChild(badge);
+      item.onclick = () => toggleSelect(i);
+    } else {
+      const empty = document.createElement('div');
+      empty.className = 'ti-empty';
+      empty.innerHTML = '<span>○</span>';
+      item.appendChild(empty);
+    }
+    grid.appendChild(item);
+  }
+}
+
+function toggleSelect(i){
+  if(!photos[i]) return;
+  const pos = selected.indexOf(i);
+  if(pos >= 0){
+    selected.splice(pos,1);
+  } else {
+    if(selected.length >= curGrid) selected.shift();
+    selected.push(i);
+  }
+  renderThumbs();
+  renderStrip();
+  updateButtons();
+}
+
+// ═══════════════════════════════════════
+// STRIP RENDER
+// ═══════════════════════════════════════
+function renderStrip(){
+  const card = document.getElementById('strip-card');
+  card.innerHTML = '';
+  for(let s=0;s<curGrid;s++){
+    const slot = document.createElement('div');
+    slot.className = 's-slot';
+    const idx = selected[s];
+    if(idx !== undefined && photos[idx]){
+      const tc = document.createElement('canvas');
+      tc.width=400; tc.height=300;
+      imageDataToCanvas(photos[idx], tc);
+      slot.appendChild(tc);
+    } else {
+      const empty = document.createElement('div');
+      empty.className = 's-slot-empty';
+      empty.innerHTML = '<span>○</span>';
+      slot.appendChild(empty);
+    }
+    card.appendChild(slot);
+  }
+  const wm = document.createElement('div');
+  wm.className = 'strip-wm';
+  wm.textContent = 'picme';
+  card.appendChild(wm);
+}
+
+// ═══════════════════════════════════════
+// STRIP CANVAS (for save/print)
+// ═══════════════════════════════════════
+function buildStripCanvas(){
+  const PW=600, PH=450, PAD=14, BOTTOM=38, GAP=4;
+  const n = selected.filter(i => i !== undefined && photos[i]).length;
+  if(n === 0) return null;
+  const count = Math.max(curGrid, n);
+  const H = PAD + count*(PH+GAP) - GAP + PAD + BOTTOM;
+  const W = PW + PAD*2;
+  const sc = document.createElement('canvas');
+  sc.width = W; sc.height = H;
+  const sctx = sc.getContext('2d');
+  sctx.fillStyle = '#ffffff';
+  sctx.fillRect(0,0,W,H);
+  for(let s=0;s<curGrid;s++){
+    const idx = selected[s];
+    if(idx !== undefined && photos[idx]){
+      const tmp = document.createElement('canvas');
+      tmp.width = capCvs.width; tmp.height = capCvs.height;
+      tmp.getContext('2d').putImageData(photos[idx],0,0);
+      const y = PAD + s*(PH+GAP);
+      sctx.drawImage(tmp,PAD,y,PW,PH);
+    }
+  }
+  // watermark
+  sctx.fillStyle = 'rgba(0,0,0,0.18)';
+  sctx.font = '300 13px "DM Sans", sans-serif';
+  sctx.textAlign = 'center';
+  sctx.fillText('picme', W/2, H-12);
+  return sc;
+}
+
+// ═══════════════════════════════════════
+// SAVE STRIP
+// ═══════════════════════════════════════
+function saveStrip(){
+  const sc = buildStripCanvas();
+  if(!sc) return;
+  const url = sc.toDataURL('image/png');
+  // save to gallery
+  strips.push(url);
+  renderGallery();
+  // download
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `picme-strip-${Date.now()}.png`;
+  a.click();
+  toast('Strip saved ✓');
+}
+
+// ═══════════════════════════════════════
+// PRINT STRIP
+// ═══════════════════════════════════════
+async function printStrip(){
+  const sc = buildStripCanvas();
+  if(!sc) return;
+  const dataURL = sc.toDataURL('image/png');
+
+  if(cloudMode || printerList.length === 0){
+    // Browser print fallback — open print dialog with strip image
+    browserPrint(dataURL);
+    return;
+  }
+
+  // Send to server print endpoint
+  const prt = document.getElementById('prt-select').value || curPrinter;
+  try {
+    toast('Sending to printer...');
+    const resp = await fetch('/api/print', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ imageData: dataURL, printerName: prt, copies:1 })
+    });
+    const data = await resp.json();
+    if(data.success){
+      toast('Sent to printer ✓ · Job: ' + (data.jobId || '—'));
+    } else {
+      toast('Print error: ' + (data.error || 'Unknown'));
+    }
+  } catch(e){
+    // fallback to browser print
+    browserPrint(dataURL);
+  }
+}
+
+function browserPrint(dataURL){
+  // Build a tiny print-only page inside an iframe
+  const iframe = document.getElementById('print-frame');
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  doc.write(`<!DOCTYPE html><html><head><style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#fff;display:flex;justify-content:center;align-items:flex-start}
+    img{max-width:100%;height:auto;display:block}
+    @media print{body{margin:0}img{width:4in}}
+  </style></head><body>
+    <img src="${dataURL}" onload="window.print();window.close()">
+  </body></html>`);
+  doc.close();
+  setTimeout(() => iframe.contentWindow.print(), 600);
+  toast('Opening print dialog...');
+}
+
+// ═══════════════════════════════════════
+// PRINTERS
+// ═══════════════════════════════════════
+async function fetchPrinters(){
+  try {
+    const resp = await fetch('/api/printers');
+    const data = await resp.json();
+    printerList = data.printers || [];
+    curPrinter  = data.defaultPrinter;
+    cloudMode   = data.cloudMode || false;
+
+    const dot   = document.getElementById('prt-dot');
+    const name  = document.getElementById('prt-name');
+    const stat  = document.getElementById('prt-stat-txt');
+    const sel   = document.getElementById('prt-select');
+    const hd    = document.getElementById('prt-dot');
+
+    if(cloudMode || printerList.length === 0){
+      dot.classList.remove('ok'); dot.classList.add('err');
+      name.textContent = 'No printer (cloud)';
+      stat.textContent = 'Browser print only';
+      stat.className = 'printer-status-txt cloud';
+      document.getElementById('prt-dot').style.background = 'var(--text-dim)';
+    } else {
+      dot.classList.add('ok');
+      name.textContent = curPrinter || printerList[0];
+      stat.textContent = 'Ready · CUPS';
+      stat.className = 'printer-status-txt';
+      document.getElementById('prt-status-lbl').textContent = 'Printer';
+
+      if(printerList.length > 1){
+        sel.style.display = 'block';
+        printerList.forEach(p => {
+          const o = document.createElement('option');
+          o.value = p; o.textContent = p;
+          if(p === curPrinter) o.selected = true;
+          sel.appendChild(o);
+        });
+      }
+    }
+    document.getElementById('prt-dot').classList.toggle('ok', !cloudMode && printerList.length > 0);
+  } catch(e){
+    cloudMode = true;
+    document.getElementById('prt-name').textContent = 'Cloud mode';
+    document.getElementById('prt-stat-txt').textContent = 'Browser print only';
+    document.getElementById('prt-stat-txt').className = 'printer-status-txt cloud';
+  }
+}
+
+// ═══════════════════════════════════════
+// GALLERY
+// ═══════════════════════════════════════
+function switchView(v){
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-' + v).classList.add('active');
+  document.querySelector(`.nav-btn[onclick="switchView('${v}')"]`).classList.add('active');
+  if(v === 'gallery') renderGallery();
+}
+
+function renderGallery(){
+  const grid = document.getElementById('gallery-grid');
+  const empty = document.getElementById('gallery-empty');
+  if(strips.length === 0){
+    if(empty) empty.style.display = 'block';
+    return;
+  }
+  if(empty) empty.style.display = 'none';
+  grid.innerHTML = '';
+  strips.forEach((url, i) => {
+    const item = document.createElement('div');
+    item.className = 'gallery-item';
+    item.innerHTML = `<img src="${url}"><div class="gi-wm">picme · strip ${i+1}</div>`;
+    item.onclick = () => {
+      const a = document.createElement('a');
+      a.href = url; a.download = `picme-strip-${i+1}.png`; a.click();
+    };
+    grid.appendChild(item);
+  });
+}
+
+// ═══════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════
+function imageDataToCanvas(id, tc){
+  const tmp = document.createElement('canvas');
+  tmp.width = id.width; tmp.height = id.height;
+  tmp.getContext('2d').putImageData(id,0,0);
+  tc.getContext('2d').drawImage(tmp,0,0,tc.width,tc.height);
+}
+
+function updateButtons(){
+  const has = selected.some(i => i !== undefined && photos[i]);
+  document.getElementById('btn-save').disabled  = !has;
+  document.getElementById('btn-print').disabled = !has;
+}
+
+function resetAll(){
+  photos   = [];
+  selected = [];
+  counting = false;
+  document.getElementById('shutter').disabled = false;
+  document.getElementById('shutter').classList.remove('counting');
+  document.getElementById('cd-wrap').classList.remove('show');
+  document.getElementById('chooser-hint').style.display = '';
+  renderDots();
+  renderThumbs();
+  renderStrip();
+  updateButtons();
+  toast('Ready for new session');
+}
+
+function toast(msg, dur=2400){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.remove('show'), dur);
+}
+
+// ═══════════════════════════════════════
+// FILTER FUNCTIONS
+// ═══════════════════════════════════════
+function clamp(v){ return v<0?0:v>255?255:v }
+
+function noir(d){
+  const px=d.data;
+  for(let i=0;i<px.length;i+=4){
+    const g=clamp((px[i]*.299+px[i+1]*.587+px[i+2]*.114)*1.15);
+    px[i]=px[i+1]=px[i+2]=g;
+  }
+}
+function fade(d){
+  const px=d.data;
+  for(let i=0;i<px.length;i+=4){
+    px[i]  =clamp(px[i]  *.82+32);
+    px[i+1]=clamp(px[i+1]*.82+28);
+    px[i+2]=clamp(px[i+2]*.82+24);
+  }
+}
+function warm(d){
+  const px=d.data;
+  for(let i=0;i<px.length;i+=4){
+    px[i]  =clamp(px[i]  *1.18);
+    px[i+1]=clamp(px[i+1]*1.03);
+    px[i+2]=clamp(px[i+2]*.80);
+  }
+}
+function cool(d){
+  const px=d.data;
+  for(let i=0;i<px.length;i+=4){
+    px[i]  =clamp(px[i]  *.84);
+    px[i+1]=clamp(px[i+1]*.96);
+    px[i+2]=clamp(px[i+2]*1.20);
+  }
+}
+function matte(d){
+  const px=d.data;
+  for(let i=0;i<px.length;i+=4){
+    px[i]  =clamp(px[i]  *.88+24);
+    px[i+1]=clamp(px[i+1]*.88+20);
+    px[i+2]=clamp(px[i+2]*.90+18);
+  }
+}
+function vivid(d){
+  const px=d.data;
+  for(let i=0;i<px.length;i+=4){
+    const avg=(px[i]+px[i+1]+px[i+2])/3;
+    px[i]  =clamp(avg+(px[i]  -avg)*1.55);
+    px[i+1]=clamp(avg+(px[i+1]-avg)*1.55);
+    px[i+2]=clamp(avg+(px[i+2]-avg)*1.55);
+  }
+}
+</script>
+</body>
+</html>
